@@ -1,14 +1,17 @@
 from typing import TYPE_CHECKING
 
 from fastapi import Request
-from llama_index.core import PromptTemplate, Settings, VectorStoreIndex, QueryBundle
+from llama_index.core import PromptTemplate, QueryBundle, Settings, VectorStoreIndex
+from llama_index.core.postprocessor import MetadataReplacementPostProcessor
+from llama_index.core.postprocessor.types import BaseNodePostprocessor
+from llama_index.core.query_engine import RetrieverQueryEngine
+from llama_index.core.retrievers import VectorIndexAutoRetriever
+from llama_index.core.schema import NodeWithScore
+from llama_index.core.tools import ToolMetadata
+from llama_index.core.vector_stores.types import MetadataInfo, VectorStoreInfo
 from llama_index.llms.openai import OpenAI
 from llama_index.question_gen.openai import OpenAIQuestionGenerator
-from llama_index.core.question_gen.types import SubQuestion
-from llama_index.core.tools import ToolMetadata
-from llama_index.core.retrievers import VectorIndexAutoRetriever
-from llama_index.core.query_engine import RetrieverQueryEngine
-from llama_index.core.vector_stores.types import MetadataInfo, VectorStoreInfo
+from pydantic import Field
 
 from app.services.qdrant_repo import get_qdrant_vector_store, nodes_to_embedding_output
 from app.types.db import V2_FILES
@@ -28,6 +31,34 @@ SIMPLE_TEXT_QA_PROMPT_TMPL = (
     "Answer: "
 )
 
+class DistinctPostProcessor(BaseNodePostprocessor):
+    target_metadata_key: str = Field(
+        description="Target metadata key to distinct node by.",
+    )
+
+    def __init__(self, target_metadata_key: str) -> None:
+        """Initialize the DistinctPostProcessor."""
+        super().__init__(target_metadata_key=target_metadata_key)
+
+    @classmethod
+    def class_name(cls) -> str:
+        """Return the name of the class."""
+        return "DistinctPostProcessor"
+
+    def _postprocess_nodes(
+        self,
+        nodes: list[NodeWithScore],
+        query_bundle: QueryBundle | None = None,  # noqa: ARG002
+    ) -> list[NodeWithScore]:
+        distinct_nodes = []
+        seen = set()
+        for node in nodes:
+            if node.node.metadata[self.target_metadata_key] not in seen:
+                seen.add(node.node.metadata[self.target_metadata_key])
+                distinct_nodes.append(node)
+
+        return distinct_nodes
+
 
 class DraftService:
     def __init__(self, request: Request, collection_name: str) -> None:
@@ -35,6 +66,7 @@ class DraftService:
 
         Args:
             request (Request): The FastAPI request object.
+            collection_name (str): The name of the collection.
 
         """
         self.request = request
@@ -64,6 +96,15 @@ class DraftService:
         )
 
     def sub_question_auto_retrieval_draft(self, draft_input: DraftInput) -> DraftOutput:
+        """Retrieve sub-questions and generates a draft based on the given draft input.
+
+        Args:
+            draft_input (DraftInput): The input for generating the draft.
+
+        Returns:
+            DraftOutput: The generated draft, email body, list of questions, and embeddings.
+
+        """
         product_categories = [file["product"] for file in V2_FILES]
         question_gen = OpenAIQuestionGenerator.from_defaults(verbose=True)
         tool_choices = [
@@ -72,35 +113,63 @@ class DraftService:
         ]
         questions = question_gen.generate(tools=tool_choices, query=QueryBundle(query_str=draft_input.email_body))
 
-        questionAnswers: list[QuestionOutput] = [
-            self.auto_retrieval_draft(query=question.sub_question, product_categories=product_categories)
+        question_answers: list[QuestionOutput] = [
+            self.__auto_retrieval_draft(query=question.sub_question, product_categories=product_categories)
             for question in questions
         ]
-        answerStr = "\n".join([f"{question.answer}" for question in questionAnswers])
-        print(f"Answer String: {answerStr}")
+        answer_str = "\n".join([f"{question.answer}" for question in question_answers])
 
         draft = self.llm.predict(
-            PromptTemplate(template=SIMPLE_TEXT_QA_PROMPT_TMPL), 
-            context_str=answerStr,
-            query_str=draft_input.email_body
+            PromptTemplate(template=SIMPLE_TEXT_QA_PROMPT_TMPL),
+            context_str=answer_str,
+            query_str=draft_input.email_body,
         )
 
-        return DraftOutput(draft=draft, email_body=draft_input.email_body, questions=questionAnswers, embeddings=None)
+        return DraftOutput(draft=draft, email_body=draft_input.email_body, questions=question_answers, embeddings=None)
 
-    def auto_retrieval_draft(self, query: str, product_categories: list[str]) -> QuestionOutput:
+    def doc_question_index_retrieval_draft(self, draft_input: DraftInput) -> DraftOutput:
+        """Retrieve the draft output for a given draft input by performing question indexing.
+
+        Args:
+            draft_input (DraftInput): The input for the draft.
+
+        Returns:
+            DraftOutput: The output of the draft.
+
+        """
+        vector_store = get_qdrant_vector_store(self.request, collection_name=self.collection_name)
+        index = VectorStoreIndex.from_vector_store(vector_store=vector_store)
+        prompt_template = PromptTemplate(template=SIMPLE_TEXT_QA_PROMPT_TMPL)
+        query_engine = index.as_query_engine(
+            similarity_top_k=5, # DistinctPostProcessor will reduce the number of nodes
+            response_mode="compact",
+            text_qa_template=prompt_template,
+            node_postprocessors=[MetadataReplacementPostProcessor(target_metadata_key="original_text"), DistinctPostProcessor(target_metadata_key="id")],
+        )
+        response: Response = query_engine.query(draft_input.email_body)
+
+        return DraftOutput(
+            draft=response.response,
+            email_body=draft_input.email_body,
+            embeddings=nodes_to_embedding_output(response.source_nodes),
+            questions=None,
+        )
+
+    def __auto_retrieval_draft(self, query: str, product_categories: list[str]) -> QuestionOutput:
         retriever = self.__get_auto_retriever(categories=product_categories)
         query_engine = RetrieverQueryEngine(retriever=retriever)
         response: Response = query_engine.query(query)
 
         return QuestionOutput(
-            question=query, answer=response.response, embeddings=nodes_to_embedding_output(response.source_nodes)
+            question=query,
+            answer=response.response,
+            embeddings=nodes_to_embedding_output(response.source_nodes),
         )
 
     def __get_auto_retriever(self, categories: list[str]) -> VectorIndexAutoRetriever:
         vector_store = get_qdrant_vector_store(self.request, collection_name=self.collection_name)
         index = VectorStoreIndex.from_vector_store(vector_store=vector_store)
         metadata_description = f"Name of the product, one of {categories}"
-        print(f"Metadata Description: {metadata_description}")
         vector_store_info = VectorStoreInfo(
             content_info="Guides on how to answer customer queries about products",
             metadata_info=[

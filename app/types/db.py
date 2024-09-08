@@ -3,6 +3,7 @@ from pydantic import BaseModel
 
 class EmbeddingOutput(BaseModel):
     text: str
+    question: str | None
     score: float
 
 
