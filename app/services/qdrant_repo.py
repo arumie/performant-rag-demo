@@ -5,7 +5,7 @@ from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient
 
-from app.types.db import EmbeddingOutput
+from app.types.db import V2_FILES, EmbeddingOutput
 
 
 class QdrantRepo:
@@ -23,7 +23,7 @@ class QdrantRepo:
 
     def simple_populate_db(self) -> None:
         """Populate the database."""
-        storage_context = get_storage_context(self.request)
+        storage_context = get_storage_context(self.request, self.collection_name)
 
         # Populate the database
         documents = SimpleDirectoryReader(
@@ -31,9 +31,20 @@ class QdrantRepo:
         ).load_data()
         VectorStoreIndex.from_documents(documents=documents, storage_context=storage_context)
 
-    async def query_db(self, query: str, collection_name: str) -> list[EmbeddingOutput]:
+    def metadata_populate_db(self) -> None:
+        """Populate the database with metadata."""
+        get_and_clear_qdrant_vector_store(self.request, collection_name=self.collection_name)
+        storage_context = get_storage_context(self.request, self.collection_name)
+
+        for file in V2_FILES:
+            documents = SimpleDirectoryReader(input_files=[f"data/v2/{file["file_name"]}"]).load_data()
+            for doc in documents:
+                doc.metadata = {"product": file["product"]}
+            VectorStoreIndex.from_documents(storage_context=storage_context, documents=documents)
+
+    async def query_db(self, query: str) -> list[EmbeddingOutput]:
         """Query the database and return a list of EmbeddingOutput objects."""
-        vector_store = get_qdrant_vector_store(self.request, collection_name=collection_name)
+        vector_store = get_qdrant_vector_store(self.request, collection_name=self.collection_name)
 
         # Query the database
         retriever = VectorStoreIndex.from_vector_store(vector_store=vector_store).as_retriever()
@@ -55,10 +66,16 @@ def get_qdrant_vector_store(request: Request, collection_name: str) -> QdrantVec
     return QdrantVectorStore(client=qdrant_client, collection_name=collection_name)
 
 
+def get_and_clear_qdrant_vector_store(request: Request, collection_name: str) -> QdrantVectorStore:
+    vector_store = get_qdrant_vector_store(request, collection_name)
+    vector_store.clear()
+    return vector_store
+
+
 def get_storage_context(request: Request, collection_name: str) -> StorageContext:
-    vector_store = get_qdrant_vector_store(request, collection_name=collection_name)
+    vector_store = get_and_clear_qdrant_vector_store(request, collection_name=collection_name)
     return StorageContext.from_defaults(vector_store=vector_store)
 
 
-def nodes_to_embedding_output (nodes: list[NodeWithScore]) -> list[EmbeddingOutput]:
+def nodes_to_embedding_output(nodes: list[NodeWithScore]) -> list[EmbeddingOutput]:
     return [EmbeddingOutput(text=node.text, score=node.score) for node in nodes]

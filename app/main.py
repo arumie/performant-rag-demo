@@ -31,20 +31,31 @@ async def get_settings(request: Request) -> dict[str, str]:
     return dict(settings)
 
 
-@app.post("/v1/draft", description="Create a draft from an email body", summary="Create a draft")
+@app.post("/v1/draft", description="Create a draft from an email body using simple RAG", summary="Create a draft")
 async def create_draft_v1(request: Request, draft_input: DraftInput) -> DraftOutput:
-    draft_service = DraftService(request)
+    draft_service = DraftService(request, "V1")
     return draft_service.create_simple_draft(draft_input)
+
+
+@app.post("/v2/draft", description="Create a draft from an email body using sub questions and auto retrieval", summary="Create a draft")
+async def create_draft_v2(request: Request, draft_input: DraftInput) -> DraftOutput:
+    draft_service = DraftService(request, "V2")
+    return draft_service.sub_question_auto_retrieval_draft(draft_input)
 
 
 @app.post("/v1/db/populate", description="Populate the Qdrant Vector Database", summary="Populate the database")
 async def v1_db_populate(request: Request) -> None:
-    repo = QdrantRepo(request)
+    repo = QdrantRepo(request, "V1")
     return repo.simple_populate_db()
+
+@app.post("/v2/db/populate", description="Populate the Qdrant Vector Database with metadata", summary="Populate the database")
+async def v2_db_populate(request: Request) -> None:
+    repo = QdrantRepo(request, "V2")
+    return repo.metadata_populate_db()
 
 @app.get("/db/query", description="Query the Qdrant Vector Database", summary="Query the database")
 async def get_db_query(request: Request, query: str, version: int) -> QueryDbOutput:
     collection_name = f"V{version}"
-    repo = QdrantRepo(request)
+    repo = QdrantRepo(request, collection_name=collection_name)
     response = await repo.query_db(query, collection_name)
     return {"response": response}
