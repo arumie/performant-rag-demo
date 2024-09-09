@@ -8,7 +8,7 @@ from llama_index.llms.openai import OpenAI
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient
 
-from app.types.db import V2_FILES, EmbeddingOutput
+from app.types.db import V2_FILES, SourceOutput
 
 
 class QdrantRepo:
@@ -68,7 +68,7 @@ class QdrantRepo:
             question_docs.extend(self.__generate_doc_questions(doc))
         VectorStoreIndex.from_documents(documents=question_docs, storage_context=storage_context)
 
-    def query_db(self, query: str) -> list[EmbeddingOutput]:
+    def query_db(self, query: str) -> list[SourceOutput]:
         """Query the database and return a list of EmbeddingOutput objects."""
         vector_store = get_qdrant_vector_store(self.request, collection_name=self.collection_name)
 
@@ -128,5 +128,6 @@ def get_storage_context(request: Request, collection_name: str) -> StorageContex
     return StorageContext.from_defaults(vector_store=vector_store)
 
 
-def nodes_to_embedding_output(nodes: list[NodeWithScore]) -> list[EmbeddingOutput]:
-    return [EmbeddingOutput(text=node.text, score=node.score, question=node.metadata["question"]) for node in nodes]
+def nodes_to_embedding_output(nodes: list[NodeWithScore]) -> list[SourceOutput]:
+    question = nodes[0].metadata.get("question", None)
+    return [SourceOutput(text=node.text, score=node.score, question=question) for node in nodes]

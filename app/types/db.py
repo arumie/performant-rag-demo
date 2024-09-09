@@ -1,14 +1,14 @@
 from pydantic import BaseModel
 
 
-class EmbeddingOutput(BaseModel):
+class SourceOutput(BaseModel):
     text: str
     question: str | None
-    score: float
+    score: float | None
 
 
 class QueryDbOutput(BaseModel):
-    response: list[EmbeddingOutput]
+    response: list[SourceOutput]
 
 
 V2_FILES = [

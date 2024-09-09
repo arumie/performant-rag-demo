@@ -1,21 +1,21 @@
-
 from pydantic import BaseModel
 
-from app.types.db import EmbeddingOutput
+from app.types.db import SourceOutput
 
 
 class DraftInput(BaseModel):
+    from_user: str | None
     email_body: str
 
 
 class QuestionOutput(BaseModel):
     question: str
     answer: str
-    embeddings: list[EmbeddingOutput]
+    sources: list[SourceOutput]
+
 
 class DraftOutput(BaseModel):
     draft: str
     email_body: str
     questions: list[QuestionOutput] | None
-    embeddings: list[EmbeddingOutput] | None
-
+    sources: list[SourceOutput] | None

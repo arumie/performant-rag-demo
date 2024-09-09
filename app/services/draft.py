@@ -4,15 +4,17 @@ from fastapi import Request
 from llama_index.core import PromptTemplate, QueryBundle, Settings, VectorStoreIndex
 from llama_index.core.postprocessor import MetadataReplacementPostProcessor
 from llama_index.core.postprocessor.types import BaseNodePostprocessor
-from llama_index.core.query_engine import RetrieverQueryEngine
+from llama_index.core.query_engine import RetrieverQueryEngine, SubQuestionQueryEngine
+from llama_index.core.response_synthesizers import Refine
 from llama_index.core.retrievers import VectorIndexAutoRetriever
 from llama_index.core.schema import NodeWithScore
-from llama_index.core.tools import ToolMetadata
+from llama_index.core.tools import QueryEngineTool, ToolMetadata
 from llama_index.core.vector_stores.types import MetadataInfo, VectorStoreInfo
 from llama_index.llms.openai import OpenAI
 from llama_index.question_gen.openai import OpenAIQuestionGenerator
 from pydantic import Field
 
+from app.services.customer_lookup import CustomerInfoQueryEngine
 from app.services.qdrant_repo import get_qdrant_vector_store, nodes_to_embedding_output
 from app.types.db import V2_FILES
 from app.types.draft import DraftInput, DraftOutput, QuestionOutput
@@ -30,6 +32,31 @@ SIMPLE_TEXT_QA_PROMPT_TMPL = (
     "Query: {query_str}\n"
     "Answer: "
 )
+
+REFINE_ANSWER_PROMPT = """
+    You work as a support center agent and you answer questions from emails from customers.
+    The original query is as follows: {query_str}
+    We have provided an existing answer: {existing_answer}
+    We have the opportunity to refine the existing answer into a helpful response and ensure that the response has the following characteristics:
+    - Start with 'Hello, thank you for reaching out to us. I am happy to help you with your query.' and end with 'Please let me know if you have any further questions.' separated by new lines.
+    - Ensure that the response answers the query in a helpful and informative way.
+    - References to the user ID should be replaced "you", "your", etc. where appropriate.
+    If the existing answer follows these guidelines already, return the existing answer.
+    Refined Answer:
+"""
+
+
+REPLACE_USER_WITH_ID_PROMPT = """
+    Replace references to 'me', 'my', etc. with the user ID.
+    example:
+    User ID: user123
+    Query: "What is the status of my order?"
+    Answer: "What is the status of user123's order?"
+    Query: {query_str}
+    User ID: {user_id}
+    Answer:
+"""
+
 
 class DistinctPostProcessor(BaseNodePostprocessor):
     target_metadata_key: str = Field(
@@ -92,7 +119,7 @@ class DraftService:
         return DraftOutput(
             draft=response.response,
             email_body=draft_input.email_body,
-            embeddings=nodes_to_embedding_output(response.source_nodes),
+            sources=nodes_to_embedding_output(response.source_nodes),
         )
 
     def sub_question_auto_retrieval_draft(self, draft_input: DraftInput) -> DraftOutput:
@@ -125,7 +152,7 @@ class DraftService:
             query_str=draft_input.email_body,
         )
 
-        return DraftOutput(draft=draft, email_body=draft_input.email_body, questions=question_answers, embeddings=None)
+        return DraftOutput(draft=draft, email_body=draft_input.email_body, questions=question_answers, sources=None)
 
     def doc_question_index_retrieval_draft(self, draft_input: DraftInput) -> DraftOutput:
         """Retrieve the draft output for a given draft input by performing question indexing.
@@ -141,17 +168,72 @@ class DraftService:
         index = VectorStoreIndex.from_vector_store(vector_store=vector_store)
         prompt_template = PromptTemplate(template=SIMPLE_TEXT_QA_PROMPT_TMPL)
         query_engine = index.as_query_engine(
-            similarity_top_k=5, # DistinctPostProcessor will reduce the number of nodes
+            similarity_top_k=5,  # DistinctPostProcessor will reduce the number of nodes
             response_mode="compact",
             text_qa_template=prompt_template,
-            node_postprocessors=[MetadataReplacementPostProcessor(target_metadata_key="original_text"), DistinctPostProcessor(target_metadata_key="id")],
+            node_postprocessors=[
+                MetadataReplacementPostProcessor(target_metadata_key="original_text"),
+                DistinctPostProcessor(target_metadata_key="id"),
+            ],
         )
         response: Response = query_engine.query(draft_input.email_body)
 
         return DraftOutput(
             draft=response.response,
             email_body=draft_input.email_body,
-            embeddings=nodes_to_embedding_output(response.source_nodes),
+            sources=nodes_to_embedding_output(response.source_nodes),
+            questions=None,
+        )
+
+    def query_router_draft(self, draft_input: DraftInput) -> DraftOutput:
+        """Retrieve the draft output for a given draft input by performing query routing.
+
+        Args:
+            draft_input (DraftInput): The input for the draft.
+
+        Returns:
+            DraftOutput: The output of the draft.
+
+        """
+        vector_store = get_qdrant_vector_store(self.request, collection_name=self.collection_name)
+        index = VectorStoreIndex.from_vector_store(vector_store=vector_store)
+        prompt_template = PromptTemplate(template=SIMPLE_TEXT_QA_PROMPT_TMPL)
+        product_query_engine = index.as_query_engine(
+            similarity_top_k=2,
+            response_mode="compact",
+            text_qa_template=prompt_template,
+        )
+
+        customer_lookup_query_engine = CustomerInfoQueryEngine(verbose=True)
+
+        product_tool = QueryEngineTool(
+            query_engine=product_query_engine,
+            metadata=ToolMetadata(name="product", description="Useful for answering questions about Fake Product"),
+        )
+        customer_lookup_tool = QueryEngineTool(
+            query_engine=customer_lookup_query_engine,
+            metadata=ToolMetadata(name="customer", description=customer_lookup_query_engine.get_engine_description()),
+        )
+        query = self.llm.predict(
+            PromptTemplate(REPLACE_USER_WITH_ID_PROMPT),
+            query_str=draft_input.email_body,
+            user_id=draft_input.from_user,
+        )
+        refine = Refine(text_qa_template=prompt_template, refine_template=PromptTemplate(REFINE_ANSWER_PROMPT))
+
+        query_engine = SubQuestionQueryEngine.from_defaults(
+            query_engine_tools=[product_tool, customer_lookup_tool],
+            use_async=False,
+            response_synthesizer=refine,
+        )
+
+        response: Response = query_engine.query(query)
+        print(response.source_nodes)
+
+        return DraftOutput(
+            draft=response.response,
+            email_body=draft_input.email_body,
+            sources=nodes_to_embedding_output(response.source_nodes),
             questions=None,
         )
 
@@ -163,7 +245,7 @@ class DraftService:
         return QuestionOutput(
             question=query,
             answer=response.response,
-            embeddings=nodes_to_embedding_output(response.source_nodes),
+            sources=nodes_to_embedding_output(response.source_nodes),
         )
 
     def __get_auto_retriever(self, categories: list[str]) -> VectorIndexAutoRetriever:
