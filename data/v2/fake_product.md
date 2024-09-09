@@ -72,7 +72,7 @@ A: Yes, we have an active community forum where users can share tips, ask questi
 A: The Fake Product offers flexible pricing plans to suit different business needs. Contact our sales team for a detailed quote based on your requirements.
 
 ## Q: What are the pricing plans?
-A: The original Fake Product also offers flexible pricing plans. The pricing options include:
+A: The Fake Product offers flexible pricing plans. The pricing options include:
 
 - **Basic Plan**: $39 per month. Ideal for small businesses and startups. Includes essential features and support.
 - **Pro Plan**: $79 per month. Designed for growing businesses. Includes advanced features and priority support.

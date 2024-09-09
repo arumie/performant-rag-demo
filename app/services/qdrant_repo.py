@@ -86,7 +86,7 @@ class QdrantRepo:
         Questions:
         """
         query_gen_prompt = PromptTemplate(query_gen_str)
-        response = self.llm.predict(query_gen_prompt, num_queries=4, text=document.text)
+        response = self.llm.predict(query_gen_prompt, num_queries=10, text=document.text)
 
         question_docs = [Document(text=question[2:].strip()) for question in response.split("\n")]
         document_id = uuid4()
