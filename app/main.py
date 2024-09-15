@@ -5,8 +5,11 @@ from typing import TypedDict
 import fastenv
 from fastapi import FastAPI, Request
 
-from app.services.draft import DraftService
-from app.services.qdrant_repo import QdrantRepo
+from app.db.qdrant_repo import QdrantRepo
+from app.services.draft_v1 import DraftV1Service
+from app.services.draft_v2 import DraftV2Service
+from app.services.draft_v3 import DraftV3Service
+from app.services.draft_v4 import DraftV4Service
 from app.types.db import QueryDbOutput
 from app.types.draft import DraftInput, DraftOutput
 
@@ -33,8 +36,8 @@ async def get_settings(request: Request) -> dict[str, str]:
 
 @app.post("/v1/draft", description="Create a draft from an email body using simple RAG", summary="Create a draft")
 async def create_draft_v1(request: Request, draft_input: DraftInput) -> DraftOutput:
-    draft_service = DraftService(request, "V1")
-    return draft_service.create_simple_draft(draft_input)
+    draft_service = DraftV1Service(request)
+    return draft_service.create_draft(draft_input)
 
 
 @app.post(
@@ -43,22 +46,22 @@ async def create_draft_v1(request: Request, draft_input: DraftInput) -> DraftOut
     summary="Create a draft",
 )
 async def create_draft_v2(request: Request, draft_input: DraftInput) -> DraftOutput:
-    draft_service = DraftService(request, "V2")
-    return draft_service.sub_question_auto_retrieval_draft(draft_input)
+    draft_service = DraftV2Service(request)
+    return draft_service.create_draft(draft_input)
 
 
 @app.post(
-    "/v3/draft", description="Create a draft from an email body using document question index", summary="Create a draft"
+    "/v3/draft", description="Create a draft from an email body using document question index", summary="Create a draft",
 )
 async def create_draft_v3(request: Request, draft_input: DraftInput) -> DraftOutput:
-    draft_service = DraftService(request, "V3")
-    return draft_service.doc_question_index_retrieval_draft(draft_input)
+    draft_service = DraftV3Service(request)
+    return draft_service.create_draft(draft_input)
 
 
 @app.post("/v4/draft", description="Create a draft from an email body using query routing", summary="Create a draft")
 async def create_draft_v4(request: Request, draft_input: DraftInput) -> DraftOutput:
-    draft_service = DraftService(request, "V1")
-    return draft_service.query_router_draft(draft_input)
+    draft_service = DraftV4Service(request)
+    return await draft_service.create_draft_v2(draft_input)
 
 
 @app.post("/v1/db/populate", description="Populate the Qdrant Vector Database", summary="Populate the database")
@@ -68,7 +71,7 @@ async def db_populate_v1(request: Request) -> None:
 
 
 @app.post(
-    "/v2/db/populate", description="Populate the Qdrant Vector Database with metadata", summary="Populate the database"
+    "/v2/db/populate", description="Populate the Qdrant Vector Database with metadata", summary="Populate the database",
 )
 async def db_populate_v2(request: Request) -> None:
     repo = QdrantRepo(request, "V2")

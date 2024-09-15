@@ -6,7 +6,7 @@ from llama_index.core.schema import Document, NodeWithScore
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.llms.openai import OpenAI
 from llama_index.vector_stores.qdrant import QdrantVectorStore
-from qdrant_client import QdrantClient
+from qdrant_client import AsyncQdrantClient, QdrantClient
 
 from app.types.db import V2_FILES, SourceOutput
 
@@ -110,11 +110,16 @@ class QdrantRepo:
 
 def get_qdrant_vector_store(request: Request, collection_name: str) -> QdrantVectorStore:
     settings = request.state.settings
-    qdrant_client = QdrantClient(
+    client = QdrantClient(
         host=settings["QDRANT_HOST"],
         port=settings["QDRANT_PORT"],
     )
-    return QdrantVectorStore(client=qdrant_client, collection_name=collection_name)
+
+    aclient = AsyncQdrantClient(
+        host=settings["QDRANT_HOST"],
+        port=settings["QDRANT_PORT"],
+    )
+    return QdrantVectorStore(client=client, aclient=aclient, collection_name=collection_name)
 
 
 def get_and_clear_qdrant_vector_store(request: Request, collection_name: str) -> QdrantVectorStore:
@@ -128,6 +133,8 @@ def get_storage_context(request: Request, collection_name: str) -> StorageContex
     return StorageContext.from_defaults(vector_store=vector_store)
 
 
-def nodes_to_embedding_output(nodes: list[NodeWithScore]) -> list[SourceOutput]:
+def nodes_to_embedding_output(nodes: list[NodeWithScore] | None) -> list[SourceOutput]:
+    if nodes is None or len(nodes) == 0:
+        return []
     question = nodes[0].metadata.get("question", None)
     return [SourceOutput(text=node.text, score=node.score, question=question) for node in nodes]

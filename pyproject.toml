@@ -27,6 +27,7 @@ ignore = [
     "D103",
     "D104",
     "T201",
+    "FBT001",
 ]
 
 [tool.ruff]

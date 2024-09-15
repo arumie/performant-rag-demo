@@ -17,5 +17,6 @@ class QuestionOutput(BaseModel):
 class DraftOutput(BaseModel):
     draft: str
     email_body: str
-    questions: list[QuestionOutput] | None
-    sources: list[SourceOutput] | None
+    questions: list[QuestionOutput] | None = None
+    sources: list[SourceOutput] | None = None
+    fail_reason: str | None = None
