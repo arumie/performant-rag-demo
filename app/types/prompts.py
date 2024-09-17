@@ -21,18 +21,27 @@ REFINE_ANSWER_PROMPT = """
     Refined Answer:
 """
 
-SUMMARIZE_DRAFT_PROMPT = """
+REFINE_DRAFT_PROMPT = """
     You work as a support center agent and you answer questions from emails from customers.
     Context from multiple sources is provided below:
     ---------------------
     {context_str}
     ---------------------
-    Given the context and no prior knowledge you generate an answer to the following email.
-    - Start with 'Hello, thank you for reaching out to us. I am happy to help you with your query.' and end with 'Please let me know if you have any further questions.' separated by new lines.
+    We have the opportunity to refine the existing answer into a helpful response and ensure that the response has the following characteristics:
+    - Start with 'Hello <name>, thank you for reaching out to us. I am happy to help you with your query.'. Include name if available.
+    - End with 'Please let me know if you have any further questions.' separated by new lines.
     - Ensure that the response answers the query in a helpful and informative way.
-    - References to the user ID should be replaced "you", "your", etc. where appropriate.
-    Query: {query_str}
-    Answer:
+    - References to the user should be replaced "you", "your" ,"<name>", etc. where appropriate.
+    If the existing answer follows these guidelines already, return the existing answer.
+    Existing Answer:
+    ---------------------
+    {existing_answer}
+    ---------------------
+    Query:
+    ---------------------
+    {query_str}
+    ---------------------
+    Refined Answer:
 """
 
 

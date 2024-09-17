@@ -1,9 +1,9 @@
 
 from fastapi import Request
-from llama_index.core import Settings
+from llama_index.core import Settings, VectorStoreIndex
 from llama_index.llms.openai import OpenAI
 
-from app.db.qdrant_repo import get_qdrant_vector_store
+from app.db import get_qdrant_vector_store
 
 
 class BaseDraftService:
@@ -19,10 +19,11 @@ class BaseDraftService:
         self.collection_name = collection_name
         self.llm = self.__set_openai_model()
         self.vector_store = get_qdrant_vector_store(self.request, collection_name=self.collection_name)
+        self.index = VectorStoreIndex.from_vector_store(vector_store=self.vector_store)
 
 
     def __set_openai_model(self) -> OpenAI:
         settings = self.request.state.settings
-        openai = OpenAI(api_key=settings["OPENAI_API_KEY"])
+        openai = OpenAI(api_key=settings["OPENAI_API_KEY"], model="gpt-4o-mini")
         Settings.llm = openai
         return openai

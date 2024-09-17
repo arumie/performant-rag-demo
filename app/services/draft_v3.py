@@ -2,14 +2,13 @@
 from typing import TYPE_CHECKING
 
 from fastapi import Request
-from llama_index.core import PromptTemplate, VectorStoreIndex
+from llama_index.core import PromptTemplate
 from llama_index.core.postprocessor import MetadataReplacementPostProcessor
 
-from app.db.qdrant_repo import get_qdrant_vector_store, nodes_to_embedding_output
-from app.services.basedraft import BaseDraftService
-from app.types.draft import DraftInput, DraftOutput
-from app.types.prompts import SIMPLE_TEXT_QA_PROMPT_TMPL
-from app.util.postprocessor import DistinctPostProcessor
+from app.db import nodes_to_embedding_output
+from app.services.base import BaseDraftService
+from app.types import SIMPLE_TEXT_QA_PROMPT_TMPL, DraftInput, DraftOutput
+from app.util import DistinctPostProcessor
 
 if TYPE_CHECKING:
     from llama_index.core.base.response.schema import Response
@@ -37,10 +36,8 @@ class DraftV3Service(BaseDraftService):
             DraftOutput: The output of the draft.
 
         """
-        vector_store = get_qdrant_vector_store(self.request, collection_name=self.collection_name)
-        index = VectorStoreIndex.from_vector_store(vector_store=vector_store)
         prompt_template = PromptTemplate(template=SIMPLE_TEXT_QA_PROMPT_TMPL)
-        query_engine = index.as_query_engine(
+        query_engine = self.index.as_query_engine(
             similarity_top_k=5,  # DistinctPostProcessor will reduce the number of nodes
             response_mode="compact",
             text_qa_template=prompt_template,

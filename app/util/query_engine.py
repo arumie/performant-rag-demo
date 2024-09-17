@@ -44,6 +44,7 @@ class CustomerInfoQueryEngine(CustomQueryEngine):
                 user_info_str += "\n".join(f"{key}: {value}" for key, value in user_info_dict.items())
             else:
                 user_info_str += "No information found for this user."
+        self.__print(pre_text="User Info String: ", text=f"{user_info_str}")
         source_nodes: list[NodeWithScore] = [NodeWithScore(node=TextNode(text=user_info_str))]
 
         question_answer_query = """
@@ -59,7 +60,7 @@ class CustomerInfoQueryEngine(CustomQueryEngine):
 
     def __print(self, text: str, pre_text: str | None = None, color: str | None = None) -> None:
         """Print the text if verbose mode is enabled."""
-        pretty_print(self.verbose, text=text, step="CustomerInfoQueryEngine", pre_text=pre_text, color=color)
+        pretty_print(verbose=self.verbose, text=text, step="CustomerInfoQueryEngine", pre_text=pre_text, color=color)
 
 
 class FilterQueryEngine(CustomQueryEngine):

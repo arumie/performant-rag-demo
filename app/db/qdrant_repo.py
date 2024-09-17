@@ -1,14 +1,18 @@
 from uuid import uuid4
 
 from fastapi import Request
-from llama_index.core import PromptTemplate, Settings, SimpleDirectoryReader, StorageContext, VectorStoreIndex
+from llama_index.core import PromptTemplate, Settings, SimpleDirectoryReader, VectorStoreIndex
 from llama_index.core.schema import Document, NodeWithScore
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.llms.openai import OpenAI
-from llama_index.vector_stores.qdrant import QdrantVectorStore
-from qdrant_client import AsyncQdrantClient, QdrantClient
 
-from app.types.db import V2_FILES, SourceOutput
+from app.db.util import (
+    get_and_clear_qdrant_vector_store,
+    get_qdrant_vector_store,
+    get_storage_context,
+    nodes_to_embedding_output,
+)
+from app.types import V2_FILES, SourceOutput
 
 
 class QdrantRepo:
@@ -107,34 +111,3 @@ class QdrantRepo:
         Settings.llm = openai
         return openai
 
-
-def get_qdrant_vector_store(request: Request, collection_name: str) -> QdrantVectorStore:
-    settings = request.state.settings
-    client = QdrantClient(
-        host=settings["QDRANT_HOST"],
-        port=settings["QDRANT_PORT"],
-    )
-
-    aclient = AsyncQdrantClient(
-        host=settings["QDRANT_HOST"],
-        port=settings["QDRANT_PORT"],
-    )
-    return QdrantVectorStore(client=client, aclient=aclient, collection_name=collection_name)
-
-
-def get_and_clear_qdrant_vector_store(request: Request, collection_name: str) -> QdrantVectorStore:
-    vector_store = get_qdrant_vector_store(request, collection_name)
-    vector_store.clear()
-    return vector_store
-
-
-def get_storage_context(request: Request, collection_name: str) -> StorageContext:
-    vector_store = get_and_clear_qdrant_vector_store(request, collection_name=collection_name)
-    return StorageContext.from_defaults(vector_store=vector_store)
-
-
-def nodes_to_embedding_output(nodes: list[NodeWithScore] | None) -> list[SourceOutput]:
-    if nodes is None or len(nodes) == 0:
-        return []
-    question = nodes[0].metadata.get("question", None)
-    return [SourceOutput(text=node.text, score=node.score, question=question) for node in nodes]

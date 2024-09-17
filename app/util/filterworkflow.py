@@ -30,6 +30,7 @@ class QueryEvent(Event):
 class RefineEvent(Event):
     existing_answer: str
     query: str
+    source_nodes: list[NodeWithScore] | None
 
 
 class Result(BaseModel):
@@ -126,7 +127,7 @@ class FilterAndQueryWorkflow(Workflow):
 
         refine = await ctx.get("refine")
         if refine:
-            return RefineEvent(existing_answer=response.response, query=query)
+            return RefineEvent(existing_answer=response.response, query=query, source_nodes=response.source_nodes)
         return StopEvent(result=Result(answer=response.response, source_nodes=response.source_nodes))
 
     @step
@@ -136,19 +137,22 @@ class FilterAndQueryWorkflow(Workflow):
         ev: RefineEvent,
     ) -> StopEvent:
         """Refine the answer based on the query."""
-        existing_answer = ev.get("existing_answer")
-        query = ev.get("query")
+        existing_answer = ev.existing_answer
+        query = ev.query
+        source_nodes: list[NodeWithScore] | None = ev.source_nodes
+        context_str = "\n".join([f"{node.node.text}" for node in source_nodes]) if source_nodes else ""
         refine_prompt = await ctx.get("refine_prompt")
         self.__print(pre_text="Refining the answer based on the query:", text=f"{query}", color="yellow", step="Refine")
         self.__print(pre_text="Existing answer:", text=f"{existing_answer}", color="yellow", step="Refine")
+        self.__print(pre_text="Context:", text=f"{context_str}", color="yellow", step="Refine")
 
         llm = await ctx.get("llm")
 
-        response: Response = llm.predict(refine_prompt, existing_answer=existing_answer, query_str=query)
+        response: Response = llm.predict(PromptTemplate(refine_prompt), existing_answer=existing_answer, query_str=query, context_str=context_str)
 
-        self.__print(f"Refined answer: {response.response}", color="green", step="Refine")
+        self.__print(f"Refined answer: {response}", color="green", step="Refine")
 
-        return StopEvent(result=Result(answer=response, filtered=False, stop_reason=None))
+        return StopEvent(result=Result(answer=response, source_nodes=source_nodes))
 
     def __print(self, text: str, step: str, pre_text: str | None = None, color: str | None = None) -> None:
         """Print the text if verbose mode is enabled."""

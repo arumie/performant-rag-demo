@@ -5,13 +5,9 @@ from typing import TypedDict
 import fastenv
 from fastapi import FastAPI, Request
 
-from app.db.qdrant_repo import QdrantRepo
-from app.services.draft_v1 import DraftV1Service
-from app.services.draft_v2 import DraftV2Service
-from app.services.draft_v3 import DraftV3Service
-from app.services.draft_v4 import DraftV4Service
-from app.types.db import QueryDbOutput
-from app.types.draft import DraftInput, DraftOutput
+from app.db import QdrantRepo
+from app.services import DraftV1Service, DraftV2Service, DraftV3Service, DraftV4Service
+from app.types import DraftInput, DraftOutput, QueryDbOutput
 
 
 class LifespanState(TypedDict):
@@ -61,7 +57,7 @@ async def create_draft_v3(request: Request, draft_input: DraftInput) -> DraftOut
 @app.post("/v4/draft", description="Create a draft from an email body using query routing", summary="Create a draft")
 async def create_draft_v4(request: Request, draft_input: DraftInput) -> DraftOutput:
     draft_service = DraftV4Service(request)
-    return await draft_service.create_draft_v2(draft_input)
+    return await draft_service.create_draft(draft_input)
 
 
 @app.post("/v1/db/populate", description="Populate the Qdrant Vector Database", summary="Populate the database")

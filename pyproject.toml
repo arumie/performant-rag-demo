@@ -11,6 +11,7 @@ dependencies = [
     "llama-index-embeddings-openai>=0.2.4",
     "llama-index-vector-stores-qdrant>=0.3.0",
     "llama-index>=0.11.7",
+    "nicegui>=2.1.0",
     "qdrant-client>=1.11.1",
     "ruff>=0.6.4",
 ]
@@ -29,6 +30,9 @@ ignore = [
     "T201",
     "FBT001",
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"frontend.py" = ["D102"]
 
 [tool.ruff]
 line-length = 120
