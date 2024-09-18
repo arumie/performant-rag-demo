@@ -38,16 +38,16 @@ This will run the FastAPI app on localhost:8000. You can access the Swagger UI b
 This gives access to the following endpoints:
 
 #### Creating drafts
-- POST localhost:8000/v1/draft
-- POST localhost:8000/v2/draft
-- POST localhost:8000/v3/draft
-- POST localhost:8000/v4/draft
+- `POST localhost:8000/v1/draft {email_body: str}`
+- `POST localhost:8000/v2/draft {email_body: str}`
+- `POST localhost:8000/v3/draft {email_body: str}`
+- `POST localhost:8000/v4/draft {email_body: str, from_user: str}`
 
 #### Populate the vector database
-- POST localhost:8000/v1/db/populate
-- POST localhost:8000/v2/db/populate
-- POST localhost:8000/v3/db/populate
-- GET localhost:8000/db/query (*to query the database*)
+- `POST localhost:8000/v1/db/populate`
+- `POST localhost:8000/v2/db/populate`
+- `POST localhost:8000/v3/db/populate`
+- `GET localhost:8000/db/query` (*to query the database*)
 
 The populate endpoints will populate the vector database with the data from the **/data** folder. 
 They need to be used before drafts can be created.
