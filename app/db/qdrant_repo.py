@@ -29,18 +29,27 @@ class QdrantRepo:
         self.embed_model = self.__set_openai_embedding()
         self.llm = self.__set_openai_model()
 
+    # ----------------------------------------------------------------------
+    # -----------------------FIRST ITERATION--------------------------------
+    # ----------------------------------------------------------------------
+
     def simple_populate_db(self) -> None:
         """Populate the database."""
         storage_context = get_storage_context(self.request, self.collection_name)
 
-        # Populate the database
+        # Read the document from the directory
         documents = SimpleDirectoryReader(
             "data/v1",
         ).load_data()
         for doc in documents:
             doc.metadata["text"] = doc.text
 
+        # Add the documents to the database
         VectorStoreIndex.from_documents(documents=documents, storage_context=storage_context)
+
+    # ----------------------------------------------------------------------
+    # -----------------------SECOND ITERATION--------------------------------
+    # ----------------------------------------------------------------------
 
     def metadata_populate_db(self) -> None:
         """Populate the database with metadata."""
@@ -49,37 +58,40 @@ class QdrantRepo:
 
         documents = []
         for file in V2_FILES:
+            # Read document from directory
             file_documents = SimpleDirectoryReader(input_files=[f"data/v2/{file["file_name"]}"]).load_data()
+
+            # Add metadata to the documents for that file
             for doc in file_documents:
                 doc.metadata["product"] = file["product"]
                 doc.metadata["file_name"] = file["file_name"]
                 doc.metadata["text"] = doc.text
             documents.extend(file_documents)
 
+        # Add the documents to the database
         VectorStoreIndex.from_documents(storage_context=storage_context, documents=documents)
+
+    # ----------------------------------------------------------------------
+    # -----------------------THIRD ITERATION--------------------------------
+    # ----------------------------------------------------------------------
 
     def question_populate_db(self) -> None:
         """Populate the database with document questions index."""
         get_and_clear_qdrant_vector_store(self.request, collection_name=self.collection_name)
         storage_context = get_storage_context(self.request, self.collection_name)
 
-        # Populate the database
+        # Load the documents from the directory
         documents = SimpleDirectoryReader(
             "data/v3",
         ).load_data()
+
+        # Generate questions for each document
         question_docs = []
         for doc in documents:
             question_docs.extend(self.__generate_doc_questions(doc))
+
+        # Add the question to the database
         VectorStoreIndex.from_documents(documents=question_docs, storage_context=storage_context)
-
-    def query_db(self, query: str) -> list[SourceOutput]:
-        """Query the database and return a list of EmbeddingOutput objects."""
-        vector_store = get_qdrant_vector_store(self.request, collection_name=self.collection_name)
-
-        # Query the database
-        retriever = VectorStoreIndex.from_vector_store(vector_store=vector_store).as_retriever()
-        nodes: list[NodeWithScore] = retriever.retrieve(query)
-        return nodes_to_embedding_output(nodes)
 
     def __generate_doc_questions(self, document: Document) -> list[Document]:
         query_gen_str = """\
@@ -89,16 +101,30 @@ class QdrantRepo:
         Text: {text}
         Questions:
         """
-        query_gen_prompt = PromptTemplate(query_gen_str)
-        response = self.llm.predict(query_gen_prompt, num_queries=10, text=document.text)
-
+        # Generate questions in separate documents/nodes
+        response = self.llm.predict(PromptTemplate(query_gen_str), num_queries=10, text=document.text)
         question_docs = [Document(text=question[2:].strip()) for question in response.split("\n")]
+
+        # Add metadata to the questions
         document_id = uuid4()
         for question_doc in question_docs:
             question_doc.metadata["original_text"] = document.text
             question_doc.metadata["question"] = question_doc.text
             question_doc.metadata["id"] = str(document_id)
         return question_docs
+
+    # ----------------------------------------------------------------------
+    # -------------------------------- UTIL --------------------------------
+    # ----------------------------------------------------------------------
+
+    def query_db(self, query: str) -> list[SourceOutput]:
+        """Query the database and return a list of EmbeddingOutput objects."""
+        vector_store = get_qdrant_vector_store(self.request, collection_name=self.collection_name)
+
+        # Query the database
+        retriever = VectorStoreIndex.from_vector_store(vector_store=vector_store).as_retriever()
+        nodes: list[NodeWithScore] = retriever.retrieve(query)
+        return nodes_to_embedding_output(nodes)
 
     def __set_openai_embedding(self) -> None:
         settings = self.request.state.settings
@@ -110,4 +136,3 @@ class QdrantRepo:
         openai = OpenAI(api_key=settings["OPENAI_API_KEY"])
         Settings.llm = openai
         return openai
-

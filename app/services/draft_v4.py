@@ -25,6 +25,10 @@ class DraftV4Service(BaseDraftService):
         self.text_qa_template = PromptTemplate(template=SIMPLE_TEXT_QA_PROMPT_TMPL)
         nest_asyncio.apply()
 
+    # ----------------------------------------------------------------------
+    # -----------------------FOURTH ITERATION-------------------------------
+    # ----------------------------------------------------------------------
+
     async def create_draft(self, draft_input: DraftInput) -> DraftOutput:
         """Retrieve the draft output for a given draft input by performing query routing.
 
@@ -35,7 +39,10 @@ class DraftV4Service(BaseDraftService):
             DraftOutput: The output of the draft.
 
         """
+        # Define the query tools
         product_tool, customer_lookup_tool = self.__get_query_tools()
+
+        # Initialize the query engine
         summarizer = TreeSummarize(verbose=True)
         query_engine = RouterQueryEngine(
             selector=LLMMultiSelector.from_defaults(),
@@ -44,12 +51,14 @@ class DraftV4Service(BaseDraftService):
             verbose=True,
         )
 
+        # Initialize the filter workflow
         workflow = FilterAndQueryWorkflow(verbose=True, timeout=20)
         filters = [
             "The user seems to be angry",
             "The user is referring to a previous interaction",
         ]
 
+        # Run the workflow
         query = f"from {draft_input.from_user}\n\n{draft_input.email_body}"
         response: Result = await workflow.run(query=query, query_engine=query_engine, refine=True, refine_prompt=REFINE_DRAFT_PROMPT, filters=filters)
 

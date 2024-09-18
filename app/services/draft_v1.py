@@ -22,6 +22,10 @@ class DraftV1Service(BaseDraftService):
         """
         super().__init__(request=request, collection_name=collection_name)
 
+    # ----------------------------------------------------------------------
+    # -----------------------FIRST ITERATION--------------------------------
+    # ----------------------------------------------------------------------
+
     def create_draft(self, draft_input: DraftInput) -> DraftOutput:
         """Create a simple draft from an email body. Uses a baseline RAG pipeline to generate a response.
 
@@ -32,8 +36,12 @@ class DraftV1Service(BaseDraftService):
             DraftOutput: The output data for the draft.
 
         """
-        prompt_template = PromptTemplate(template=SIMPLE_TEXT_QA_PROMPT_TMPL)
-        query_engine = self.index.as_query_engine(response_mode="compact", text_qa_template=prompt_template)
+        # Initialize the query engine
+        query_engine = self.index.as_query_engine(
+            response_mode="compact", text_qa_template=PromptTemplate(template=SIMPLE_TEXT_QA_PROMPT_TMPL),
+        )
+
+        # Generate the draft
         response: Response = query_engine.query(draft_input.email_body)
 
         return DraftOutput(

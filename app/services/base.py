@@ -16,8 +16,12 @@ class BaseDraftService:
 
         """
         self.request = request
-        self.collection_name = collection_name
+
+        # Initialize the LLM to be used in the pipeline (OpenAI gpt-4o-mini)
         self.llm = self.__set_openai_model()
+
+        # Initialize the vector store and index for retrieval
+        self.collection_name = collection_name
         self.vector_store = get_qdrant_vector_store(self.request, collection_name=self.collection_name)
         self.index = VectorStoreIndex.from_vector_store(vector_store=self.vector_store)
 

@@ -1,6 +1,7 @@
 SIMPLE_TEXT_QA_PROMPT_TMPL = (
     "You work as a support center agent and you answer questions from emails from customers."
-    "You always start with 'Hello, thank you for reaching out to us. I am happy to help you with your query.' and end with 'Please let me know if you have any further questions.' separated by new lines\n"
+    "You always start with 'Hello, thank you for reaching out to us. I am happy to help you with your query.'"
+    "and end with 'Please let me know if you have any further questions.' separated by new lines\n"
     "---------------------\n"
     "{context_str}\n"
     "---------------------\n"

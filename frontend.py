@@ -32,6 +32,12 @@ class State:
                 4: "Hi\nWhats the price for Fake Product and Fake Product 2.0?\nThanks",
             },
             "3": {
+                1: "Hi\nWhat is the price for the Basic plan?\nThanks",
+                2: "Hi\n\nHow does the Fake Product integrate with existing systems?\nThanks",
+                3: "Hi\n\nWhat are the pricing plans for Fake Product?\nThanks",
+                4: "Hi\n\nCan Fake Product be customized?\nThanks",
+            },
+            "4": {
                 1: "Hi\nI'm very unhappy with the Fake Product. Can i get a refund?\nThanks",
                 2: "Hi\nWhen we talked last time you helped me with setting up the Fake Product plan. Can you remind me how that worked?\nThanks",
                 3: "Hi\nWhen does my current plan end?\nThanks",
@@ -41,6 +47,10 @@ class State:
 
         if self.version in presets:
             self.email_body = presets[self.version].get(preset, "")
+        self.on_change()
+
+    def clear_result(self) -> None:
+        self.result = None
         self.on_change()
 
     async def create_draft(self) -> None:
@@ -54,9 +64,9 @@ class State:
         response = await run.io_bound(
             requests.post, url, timeout=40, json={"from_user": state.user_id, "email_body": state.email_body},
         )
+        self.loading = False
         result = DraftOutput(**response.json())
         self.result = result
-        self.loading = False
         self.on_change()
         ui.notify("Draft created")
 
@@ -70,14 +80,14 @@ def main() -> None:
         ui.button("Preset 4", on_click=lambda: state.set_preset(4))
         ui.space()
         ui.button(
-            "Qdrant",
+            "Database",
             on_click=lambda: ui.navigate.to(
                 target=f"http://localhost:6333/dashboard#/collections/V{'1' if state.version == '4' else state.version}",
                 new_tab=True,
             ),
         )
     with ui.card().classes("w-2/3 m-auto"):
-        with ui.row():
+        with ui.row().classes("w-full"):
             ui.select(
                 label="Version",
                 options=["1", "2", "3", "4"],
@@ -91,12 +101,13 @@ def main() -> None:
                     value=state.user_id,
                 ).bind_value(state, "user_id").classes("w-44")
         ui.textarea("Message", value=state.email_body).classes("w-full").bind_value(state, "email_body")
-        ui.button("Create draft", on_click=lambda: state.create_draft()).classes("w-full")
+        ui.button("Create draft", on_click=lambda: state.create_draft(), color="green").classes("w-full")
 
     with ui.card().classes("w-2/3 m-auto"):
         if state.loading:
             ui.spinner(size="3em").classes("m-auto")
         elif state.result:
+            ui.button("X", on_click=lambda: state.clear_result(), color="red").classes("rounded-full ml-auto")
             if state.result.fail_reason:
                 ui.markdown("#### Draft not created")
                 render_markdown(f"{state.result.fail_reason}").classes("text-red-500")
@@ -127,16 +138,18 @@ def render_questions() -> None:
 
 def render_sources(sources: list[SourceOutput]) -> None:
     if sources and len(sources) > 0:
-        with ui.expansion("Sources!", icon="source").classes("w-full"):
+        with ui.expansion("Sources", icon="source").classes("w-full"):
             for source in sources:
                 ui.separator()
                 if source.text:
+                    ui.markdown("##### Text")
                     render_markdown(f"{source.text}")
                 if source.question:
+                    ui.markdown("##### Question")
                     render_markdown(f"{source.question}")
                 if source.score:
-                    ui.markdown("---")
-                    ui.markdown(f"Score: **{source.score}** ")
+                    ui.markdown("##### Score")
+                    ui.markdown(f" **{source.score}** ")
 
 
 state = State(on_change=main.refresh)

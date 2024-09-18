@@ -25,6 +25,9 @@ class DraftV3Service(BaseDraftService):
         """
         super().__init__(request, collection_name="V3")
 
+    # ----------------------------------------------------------------------
+    # -----------------------THIRD ITERATION--------------------------------
+    # ----------------------------------------------------------------------
 
     def create_draft(self, draft_input: DraftInput) -> DraftOutput:
         """Retrieve the draft output for a given draft input by performing question indexing.
@@ -36,16 +39,22 @@ class DraftV3Service(BaseDraftService):
             DraftOutput: The output of the draft.
 
         """
-        prompt_template = PromptTemplate(template=SIMPLE_TEXT_QA_PROMPT_TMPL)
+        # Define the post-processors
+        metadata_replacement_pp = MetadataReplacementPostProcessor(target_metadata_key="original_text")
+        distinct_pp = DistinctPostProcessor(target_metadata_key="id")
+
+        # Initialize the query engine
         query_engine = self.index.as_query_engine(
             similarity_top_k=5,  # DistinctPostProcessor will reduce the number of nodes
             response_mode="compact",
-            text_qa_template=prompt_template,
+            text_qa_template=PromptTemplate(template=SIMPLE_TEXT_QA_PROMPT_TMPL),
             node_postprocessors=[
-                MetadataReplacementPostProcessor(target_metadata_key="original_text"),
-                DistinctPostProcessor(target_metadata_key="id"),
+                metadata_replacement_pp,
+                distinct_pp,
             ],
         )
+
+        # Generate the draft
         response: Response = query_engine.query(draft_input.email_body)
 
         return DraftOutput(
