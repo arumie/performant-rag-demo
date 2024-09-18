@@ -5,7 +5,8 @@ The demo is a simple question answering system that uses the RAG model to answer
 
 ## Installation
 
-This project uses [astral/uv](https://docs.astral.sh/uv/) for managing the project
+This project uses [astral/uv](https://docs.astral.sh/uv/) for managing the project. See [their documentation](https://docs.astral.sh/uv/getting-started/installation/) for instructions on how to install `uv`.
+
 Run the following command to install the required packages:
 
 ```bash
@@ -16,7 +17,7 @@ uv sync
 
 ### Starting Qdrant with Docker
 
-To start Qdrant with Docker, use the following command:
+To start Qdrant locally with Docker, use the following command:
 
 ```bash
 docker run -p 6333:6333 qdrant/qdrant
@@ -46,8 +47,10 @@ This gives access to the following endpoints:
 - POST localhost:8000/v1/db/populate
 - POST localhost:8000/v2/db/populate
 - POST localhost:8000/v3/db/populate
-- POST localhost:8000/v4/db/populate
 - GET localhost:8000/db/query (*to query the database*)
+
+The populate endpoints will populate the vector database with the data from the **/data** folder. 
+They need to be used before drafts can be created.
 
 ### Setting up the environment variables
 
