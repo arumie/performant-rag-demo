@@ -20,7 +20,7 @@ class DraftV1Service(BaseDraftService):
             collection_name (str): The name of the collection.
 
         """
-        super().__init__(request=request, collection_name=collection_name)
+        super().__init__(request=request, collection_name=collection_name, enable_hybrid=True)
 
     # ----------------------------------------------------------------------
     # -----------------------FIRST ITERATION--------------------------------
@@ -38,7 +38,9 @@ class DraftV1Service(BaseDraftService):
         """
         # Initialize the query engine
         query_engine = self.index.as_query_engine(
-            response_mode="compact", text_qa_template=PromptTemplate(template=SIMPLE_TEXT_QA_PROMPT_TMPL),
+            response_mode="compact",
+            text_qa_template=PromptTemplate(template=SIMPLE_TEXT_QA_PROMPT_TMPL),
+            vector_store_query_mode="hybrid",
         )
 
         # Generate the draft

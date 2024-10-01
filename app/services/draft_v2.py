@@ -53,13 +53,14 @@ class DraftV2Service(BaseDraftService):
         ]
 
         # Generate subquestions from the email body
+        # Categorize each question by product
         question_gen = OpenAIQuestionGenerator.from_defaults(verbose=True)
         questions = question_gen.generate(tools=product_choices, query=QueryBundle(query_str=draft_input.email_body))
 
         # Retrieve the answers for each subquestion
         question_answers: list[QuestionOutput] = []
         for question in questions:
-            answer = self.__auto_retrieval_answer(query=question.sub_question, product=question.tool_name)
+            answer = self.__answer_question_by_product(query=question.sub_question, product=question.tool_name)
             question_answers.append(answer)
 
         # Generate the draft using the answers as context
@@ -72,7 +73,7 @@ class DraftV2Service(BaseDraftService):
 
         return DraftOutput(draft=draft, email_body=draft_input.email_body, questions=question_answers, sources=None)
 
-    def __auto_retrieval_answer(self, query: str, product: str) -> QuestionOutput:
+    def __answer_question_by_product(self, query: str, product: str) -> QuestionOutput:
         """Retrieve a draft output for a given query and product."""
         print(f"Query: {query}")
         print(f"Product: {product}")

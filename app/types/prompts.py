@@ -10,16 +10,13 @@ SIMPLE_TEXT_QA_PROMPT_TMPL = (
     "Answer: "
 )
 
-REFINE_ANSWER_PROMPT = """
-    You work as a support center agent and you answer questions from emails from customers.
-    The original query is as follows: {query_str}
-    We have provided an existing answer: {existing_answer}
-    We have the opportunity to refine the existing answer into a helpful response and ensure that the response has the following characteristics:
-    - Start with 'Hello, thank you for reaching out to us. I am happy to help you with your query.' and end with 'Please let me know if you have any further questions.' separated by new lines.
-    - Ensure that the response answers the query in a helpful and informative way.
-    - References to the user ID should be replaced "you", "your", etc. where appropriate.
-    If the existing answer follows these guidelines already, return the existing answer.
-    Refined Answer:
+QUESTION_GENERATION_PROMPT = """\
+    You are a helpful assistant that, given a piece of text, generate questions that text answers.
+    Questions should be answerable by the text.
+    Questions can have the same answer, but should be different.
+    Generate {num_queries} questions, one on each line, related to the following text:
+    Text: {text}
+    Questions:
 """
 
 REFINE_DRAFT_PROMPT = """

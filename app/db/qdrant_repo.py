@@ -7,12 +7,12 @@ from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.llms.openai import OpenAI
 
 from app.db.util import (
-    get_and_clear_qdrant_vector_store,
     get_qdrant_vector_store,
     get_storage_context,
     nodes_to_embedding_output,
 )
 from app.types import V2_FILES, SourceOutput
+from app.types.prompts import QUESTION_GENERATION_PROMPT
 
 
 class QdrantRepo:
@@ -35,7 +35,8 @@ class QdrantRepo:
 
     def simple_populate_db(self) -> None:
         """Populate the database."""
-        storage_context = get_storage_context(self.request, self.collection_name)
+        storage_context = get_storage_context(self.request, self.collection_name, enable_hybrid=True)
+        storage_context.vector_store.clear()
 
         # Read the document from the directory
         documents = SimpleDirectoryReader(
@@ -45,7 +46,7 @@ class QdrantRepo:
             doc.metadata["text"] = doc.text
 
         # Add the documents to the database
-        VectorStoreIndex.from_documents(documents=documents, storage_context=storage_context)
+        VectorStoreIndex.from_documents(documents=documents, storage_context=storage_context, show_progress=True)
 
     # ----------------------------------------------------------------------
     # -----------------------SECOND ITERATION--------------------------------
@@ -53,8 +54,8 @@ class QdrantRepo:
 
     def metadata_populate_db(self) -> None:
         """Populate the database with metadata."""
-        get_and_clear_qdrant_vector_store(self.request, collection_name=self.collection_name)
         storage_context = get_storage_context(self.request, self.collection_name)
+        storage_context.vector_store.clear()
 
         documents = []
         for file in V2_FILES:
@@ -69,7 +70,7 @@ class QdrantRepo:
             documents.extend(file_documents)
 
         # Add the documents to the database
-        VectorStoreIndex.from_documents(storage_context=storage_context, documents=documents)
+        VectorStoreIndex.from_documents(storage_context=storage_context, documents=documents, show_progress=True)
 
     # ----------------------------------------------------------------------
     # -----------------------THIRD ITERATION--------------------------------
@@ -77,8 +78,8 @@ class QdrantRepo:
 
     def question_populate_db(self) -> None:
         """Populate the database with document questions index."""
-        get_and_clear_qdrant_vector_store(self.request, collection_name=self.collection_name)
         storage_context = get_storage_context(self.request, self.collection_name)
+        storage_context.vector_store.clear()
 
         # Load the documents from the directory
         documents = SimpleDirectoryReader(
@@ -94,15 +95,8 @@ class QdrantRepo:
         VectorStoreIndex.from_documents(documents=question_docs, storage_context=storage_context)
 
     def __generate_doc_questions(self, document: Document) -> list[Document]:
-        query_gen_str = """\
-        You are a helpful assistant that, given a piece of text, generate questions that text answers.
-        Questions should be answerable by the text. Questions can have the same answer, but should be different.
-        Generate {num_queries} questions, one on each line, related to the following text:
-        Text: {text}
-        Questions:
-        """
         # Generate questions in separate documents/nodes
-        response = self.llm.predict(PromptTemplate(query_gen_str), num_queries=10, text=document.text)
+        response = self.llm.predict(PromptTemplate(QUESTION_GENERATION_PROMPT), num_queries=10, text=document.text)
         question_docs = [Document(text=question[2:].strip()) for question in response.split("\n")]
 
         # Add metadata to the questions

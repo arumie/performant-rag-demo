@@ -88,5 +88,5 @@ async def db_populate_v3(request: Request) -> None:
 async def get_db_query(request: Request, query: str, version: int) -> QueryDbOutput:
     collection_name = f"V{version}"
     repo = QdrantRepo(request, collection_name=collection_name)
-    response = await repo.query_db(query)
+    response = repo.query_db(query)
     return {"response": response}

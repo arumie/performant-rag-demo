@@ -147,9 +147,6 @@ def render_sources(sources: list[SourceOutput]) -> None:
                 if source.question:
                     ui.markdown("##### Question")
                     render_markdown(f"{source.question}")
-                if source.score:
-                    ui.markdown("##### Score")
-                    ui.markdown(f" **{source.score}** ")
 
 
 state = State(on_change=main.refresh)

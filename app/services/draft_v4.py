@@ -21,7 +21,7 @@ class DraftV4Service(BaseDraftService):
             collection_name (str): The name of the collection.
 
         """
-        super().__init__(request, collection_name="V1")
+        super().__init__(request, collection_name="V1", enable_hybrid=True)
         self.text_qa_template = PromptTemplate(template=SIMPLE_TEXT_QA_PROMPT_TMPL)
         nest_asyncio.apply()
 
@@ -78,6 +78,7 @@ class DraftV4Service(BaseDraftService):
             response_mode="compact",
             text_qa_template=self.text_qa_template,
             verbose=True,
+            vector_store_query_mode="hybrid",
         )
 
         customer_lookup_query_engine = CustomerInfoQueryEngine(verbose=True)

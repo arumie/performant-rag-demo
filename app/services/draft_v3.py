@@ -1,4 +1,3 @@
-
 from typing import TYPE_CHECKING
 
 from fastapi import Request
@@ -40,7 +39,10 @@ class DraftV3Service(BaseDraftService):
 
         """
         # Define the post-processors
+        # MetadataReplacementPostProcessor will replace the original_text with the text of the node
         metadata_replacement_pp = MetadataReplacementPostProcessor(target_metadata_key="original_text")
+
+        # DistinctPostProcessor will reduce the number of nodes to distinct nodes
         distinct_pp = DistinctPostProcessor(target_metadata_key="id")
 
         # Initialize the query engine

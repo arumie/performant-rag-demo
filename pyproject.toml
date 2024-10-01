@@ -7,6 +7,7 @@ requires-python = ">=3.12"
 dependencies = [
     "fastapi-versioning>=0.10.0",
     "fastapi[standard]>=0.114.0",
+    "fastembed>=0.3.6",
     "fastenv>=0.5.0",
     "llama-index-embeddings-openai>=0.2.4",
     "llama-index-vector-stores-qdrant>=0.3.0",
@@ -14,6 +15,7 @@ dependencies = [
     "nicegui>=2.1.0",
     "qdrant-client>=1.11.1",
     "ruff>=0.6.4",
+    "uv>=0.4.15",
 ]
 
 
@@ -29,6 +31,7 @@ ignore = [
     "D104",
     "T201",
     "FBT001",
+    "FBT002",
 ]
 
 [tool.ruff.lint.per-file-ignores]
